@@ -1,0 +1,196 @@
+   
+   //Objects 
+    Button upload, selectimgs;
+    private Bitmap bitmap;
+    private String encodedImage;
+    ArrayList<String> bitmaps = new ArrayList<String>();
+
+  // Library
+  
+     // For Permission
+      implementation 'com.karumi:dexter:6.2.0'
+      
+      // For Network Handling
+      implementation 'com.android.volley:volley:1.1.1'
+      
+      
+      
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     // First Select Multiple Images And Click Upload btn
+   
+        selectimgs.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                bitmaps.clear();
+                imgnameV2.clear();
+                Dexter.withActivity(FlatDetailsActivity.this).withPermission(READ_EXTERNAL_STORAGE).withListener(new PermissionListener() {
+                    @Override
+                    public void onPermissionGranted(PermissionGrantedResponse permissionGrantedResponse) {
+                        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                        intent.setType("image/*");
+                        startActivityForResult(Intent.createChooser(intent, "select image"),1);
+                    }
+                    @Override
+                    public void onPermissionDenied(PermissionDeniedResponse permissionDeniedResponse) {
+                    }
+                    @Override
+                    public void onPermissionRationaleShouldBeShown(PermissionRequest permissionRequest, PermissionToken permissionToken) {
+                        permissionToken.continuePermissionRequest();
+                    }
+                }).check();
+            }
+        });
+
+
+// Upload Multiple Images
+
+        upload.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+        
+                    postimage();
+                
+            }
+        });
+
+   
+   
+   
+   
+   
+   
+   
+       @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        if(requestCode == 1 && resultCode == RESULT_OK && data != null){
+
+
+            ClipData clipData = data.getClipData();
+            if(clipData != null){
+                for(int i = 0; i < clipData.getItemCount(); i++){
+                    Uri Imageuri = clipData.getItemAt(i).getUri();
+                    try {
+                        InputStream is = getContentResolver().openInputStream(Imageuri);
+                        Bitmap bitmap = BitmapFactory.decodeStream(is);
+                        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                        bitmap.compress(Bitmap.CompressFormat.JPEG,25,stream);
+                        byte[] imageBytes = stream.toByteArray();
+                        encodedImage = String.valueOf(Base64.encodeToString(imageBytes, Base64.DEFAULT));
+                        bitmaps.add(encodedImage);
+//                        File f = new File(String.valueOf(Imageuri));
+//                        imageName = f.getName();
+//                        imgnameV2.add(imageName);
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }else {
+                Uri imageuri = data.getData();
+                try {
+                    InputStream is = getContentResolver().openInputStream(imageuri);
+                    Bitmap bitmap = BitmapFactory.decodeStream(is);
+                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                    bitmap.compress(Bitmap.CompressFormat.JPEG,25,stream);
+                    byte[] imageBytes = stream.toByteArray();
+                    encodedImage = android.util.Base64.encodeToString(imageBytes, Base64.DEFAULT);
+                    bitmaps.add(encodedImage);
+
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+
+            }
+
+
+        }
+
+        super.onActivityResult(requestCode, resultCode, data);
+
+    }
+
+
+
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   public void postimage(){
+   
+   String URL = "YOUR URL";
+        progressDialog.show();
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, URL, new Response.Listener<String>() {
+
+            @Override
+            public void onResponse(String response) {
+                System.out.println("params123 response :: "+ response);
+                progressDialog.dismiss();
+
+
+
+                try {
+                    JSONObject obj = new JSONObject(response);
+                    if(obj.getBoolean("error")){
+                        showmessage(obj.getString("message"));
+                    }else{
+                        showmessage(obj.getString("message"));
+                    }
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                progressDialog.dismiss();
+                Toast.makeText(FlatDetailsActivity.this,"Something Went Wrong",Toast.LENGTH_SHORT).show();
+                Log.d("VOLLEY", String.valueOf(error));
+            }
+        }){
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> params = new HashMap<>();
+
+                for(int i = 0; i < bitmaps.size(); i++){
+                    params.put("size", String.valueOf(bitmaps.size()));
+                    params.put("image"+i, bitmaps.get(i));
+        
+                }
+
+                return params;
+            }
+        };
+        stringRequest.setRetryPolicy(new DefaultRetryPolicy(
+                50000,
+                DefaultRetryPolicy.DEFAULT_MAX_RETRIES,
+                DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+
+        VolleySingleton.getInstance(this).addToRequestQueue(stringRequest);
+    }
